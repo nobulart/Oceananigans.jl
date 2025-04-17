@@ -29,7 +29,8 @@ function on_architecture(::MetalGPU, s::StepRangeLen)
     step = convert(Float32, s.step)
     len = s.len
     offset = s.offset
-    return StepRangeLen(ref, step, len, offset)
+    range = StepRangeLen(ref, step, len, offset)
+    return MtlArray(collect(range))
 end
 
 @inline convert_to_device(::MetalGPU, args) = Metal.mtlconvert(args)
