@@ -1,6 +1,17 @@
-include("dependencies_for_runtests.jl")
+module MetalGPUTests
 
+using Test
 using Metal
+using Oceananigans
+using Oceananigans.Architectures: GPU, array_type
+using Oceananigans.Models.HydrostaticFreeSurfaceModels: HydrostaticFreeSurfaceModel, SplitExplicitFreeSurface
+using Oceananigans.TurbulenceClosures: WENO
+using Oceananigans.Coriolis: FPlane
+using Oceananigans.BuoyancyFormulations: BuoyancyTracer
+using Oceananigans.Grids: RectilinearGrid, architecture
+using Oceananigans.Simulations: Simulation
+using Oceananigans.Units: minute, minutes
+using Oceananigans.Utils: time
 
 Oceananigans.defaults.FloatType = Float32
 
@@ -38,5 +49,9 @@ Oceananigans.defaults.FloatType = Float32
 
     @test iteration(simulation) == 3
     @test time(simulation) == 3minutes
+
+    # Additional test to confirm Metal device availability
+    @test length(Metal.devices()) > 0
 end
 
+end # module
