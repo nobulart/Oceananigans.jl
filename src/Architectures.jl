@@ -1,7 +1,7 @@
 module Architectures
 
 export AbstractArchitecture, AbstractSerialArchitecture
-export CPU, GPU, ReactantState
+export CPU, GPU, MetalGPU, ReactantState
 export device, architecture, unified_array, device_copy_to!
 export array_type, on_architecture, arch_array
 
@@ -9,6 +9,7 @@ using CUDA
 using KernelAbstractions
 using Adapt
 using OffsetArrays
+using Metal  # Import Metal.jl for Apple Metal support
 
 """
     AbstractArchitecture
@@ -36,7 +37,7 @@ struct CPU <: AbstractSerialArchitecture end
     GPU(device)
 
 Return a GPU architecture using `device`.
-`device` defauls to CUDA.CUDABackend(always_inline=true)
+`device` defaults to CUDA.CUDABackend(always_inline=true)
 """
 struct GPU{D} <: AbstractSerialArchitecture 
     device :: D
@@ -55,6 +56,54 @@ function GPU()
         throw(ArgumentError(msg))
     end
 end
+
+"""
+    MetalGPU(device)
+
+Run Oceananigans on an Apple Metal GPU.
+"""
+struct MetalGPU <: AbstractSerialArchitecture
+    device :: Any  # Use Any to store the device object
+end
+
+# Define the device function for MetalGPU
+function device(a::MetalGPU)
+    return a.device
+end
+
+# Constructor for MetalGPU
+MetalGPU() = MetalGPU(Metal.devices()[1])  # Use the first available Metal device
+
+Base.summary(::MetalGPU) = "MetalGPU"
+
+# Define the device function for MetalGPU
+# device(a::MetalGPU) = a.device
+
+# Extend the architecture function to detect Metal arrays
+architecture(::Metal.MtlArray) = MetalGPU()
+
+# Define the array_type function for MetalGPU
+array_type(::MetalGPU) = Metal.MtlArray
+
+# Define on_architecture for MetalGPU
+on_architecture(::MetalGPU, a::Array) = Metal.MtlArray(a)
+on_architecture(::MetalGPU, a::Metal.MtlArray) = a
+on_architecture(::MetalGPU, a::BitArray) = Metal.MtlArray(a)
+on_architecture(::MetalGPU, a::SubArray{<:Any, <:Any, <:Array}) = Metal.MtlArray(a)
+
+# Define unified_array for MetalGPU
+unified_array(::MetalGPU, a) = a
+
+# Add Metal-specific device copy function (if needed)
+@inline device_copy_to!(dst::Metal.MtlArray, src::Metal.MtlArray; kw...) = Metal.copy!(dst, src)
+
+# Add Metal-specific unsafe_free! function (if needed)
+@inline unsafe_free!(a::Metal.MtlArray) = Metal.unsafe_free!(a)
+@inline unsafe_free!(a) = nothing
+
+# Convert arguments to Metal-compatible types
+@inline convert_to_device(::MetalGPU, args) = args
+@inline convert_to_device(::MetalGPU, args::Tuple) = map(identity, args)
 
 """
     ReactantState <: AbstractArchitecture
@@ -152,4 +201,3 @@ function arch_array(arch, arr)
 end
 
 end # module
-

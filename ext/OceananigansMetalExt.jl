@@ -4,14 +4,12 @@ using Metal
 using Oceananigans
 
 import Oceananigans.Architectures:
+    MetalGPU,  # Import MetalGPU from Architectures.jl
     architecture,
     convert_to_device,
     on_architecture
 
-const MetalGPU = GPU{<:Metal.MetalBackend}
-MetalGPU() = GPU(Metal.MetalBackend())
-Base.summary(::MetalGPU) = "MetalGPU"
-
+# Extend methods for MetalGPU
 architecture(::MtlArray) = MetalGPU()
 
 on_architecture(::MetalGPU, a::Number) = a
@@ -36,4 +34,3 @@ end
 @inline convert_to_device(::MetalGPU, args::Tuple) = map(Metal.mtlconvert, args)
 
 end # module
-

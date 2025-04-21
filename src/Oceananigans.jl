@@ -2,6 +2,7 @@
 Main module for `Oceananigans.jl` -- a Julia software for fast, friendly, flexible,
 data-driven, ocean-flavored fluid dynamics on CPUs and GPUs.
 """
+__precompile__(false)
 module Oceananigans
 
 export
@@ -39,7 +40,7 @@ export
     # Fields and field manipulation
     Field, CenterField, XFaceField, YFaceField, ZFaceField,
     Average, Integral, CumulativeIntegral, Reduction, Accumulation, BackgroundField,
-    interior, set!, compute!, regrid!,
+    interior, set!, compute!, regrid!, 
 
     # Forcing functions
     Forcing, Relaxation, LinearTarget, GaussianMask, AdvectiveForcing,
@@ -110,6 +111,7 @@ export
     prettytime
 
 using CUDA
+using Metal  # Import Metal.jl for Apple Metal support
 using DocStringExtensions
 using FFTW
 
@@ -119,7 +121,6 @@ function __init__()
                  Oceananigans is currently tested on Julia v1.10."
                  If you find issues with Julia v1.11 or later,"
                  please report at https://github.com/CliMA/Oceananigans.jl/issues/new"""
-
     end
 
     threads = Threads.nthreads()
@@ -137,6 +138,21 @@ function __init__()
         end
 
         CUDA.allowscalar(false)
+    end
+
+    # Check for Metal support
+    try
+        devices = Metal.devices()
+        if isempty(devices)
+            println("No Metal-compatible GPU detected.")
+        else
+            println("Apple Metal GPU detected. Metal support is enabled.")
+            for (i, dev) in enumerate(devices)
+                println("Metal device $i: ", dev)
+            end
+        end
+    catch e
+        println("Metal support could not be initialized: ", e)
     end
 end
 
