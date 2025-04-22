@@ -58,50 +58,49 @@ function GPU()
 end
 
 """
-    MetalGPU(device)
+    MetalGPU(device::Metal.MTLDevice)
 
 Run Oceananigans on an Apple Metal GPU.
 """
 struct MetalGPU <: AbstractSerialArchitecture
-    device :: Any  # Use Any to store the device object
+    device :: Metal.MTLDevice
 end
 
-# Define the device function for MetalGPU
-function device(a::MetalGPU)
-    return a.device
+# Constructor for MetalGPU with error handling
+function MetalGPU()
+    devs = Metal.devices()
+    if isempty(devs)
+        throw(ArgumentError("No Apple Metal devices found!"))
+    end
+    return MetalGPU(devs[1])
 end
-
-# Constructor for MetalGPU
-MetalGPU() = MetalGPU(Metal.devices()[1])  # Use the first available Metal device
 
 Base.summary(::MetalGPU) = "MetalGPU"
 
-# Define the device function for MetalGPU
-# device(a::MetalGPU) = a.device
+device(a::MetalGPU) = a.device
 
-# Extend the architecture function to detect Metal arrays
+# Architecture dispatch for Metal arrays
 architecture(::Metal.MtlArray) = MetalGPU()
 
-# Define the array_type function for MetalGPU
+# Array type for MetalGPU
 array_type(::MetalGPU) = Metal.MtlArray
 
-# Define on_architecture for MetalGPU
+# on_architecture for MetalGPU
 on_architecture(::MetalGPU, a::Array) = Metal.MtlArray(a)
 on_architecture(::MetalGPU, a::Metal.MtlArray) = a
 on_architecture(::MetalGPU, a::BitArray) = Metal.MtlArray(a)
 on_architecture(::MetalGPU, a::SubArray{<:Any, <:Any, <:Array}) = Metal.MtlArray(a)
 
-# Define unified_array for MetalGPU
+# unified_array for MetalGPU
 unified_array(::MetalGPU, a) = a
 
-# Add Metal-specific device copy function (if needed)
+# device_copy_to! for MetalGPU
 @inline device_copy_to!(dst::Metal.MtlArray, src::Metal.MtlArray; kw...) = Metal.copy!(dst, src)
 
-# Add Metal-specific unsafe_free! function (if needed)
+# unsafe_free! for MetalGPU
 @inline unsafe_free!(a::Metal.MtlArray) = Metal.unsafe_free!(a)
-@inline unsafe_free!(a) = nothing
 
-# Convert arguments to Metal-compatible types
+# convert_to_device for MetalGPU
 @inline convert_to_device(::MetalGPU, args) = args
 @inline convert_to_device(::MetalGPU, args::Tuple) = map(identity, args)
 
@@ -186,7 +185,6 @@ end
 @inline device_copy_to!(dst::Array, src::Array; kw...) = Base.copyto!(dst, src)
 
 @inline unsafe_free!(a::CuArray) = CUDA.unsafe_free!(a)
-@inline unsafe_free!(a)          = nothing
 
 # Convert arguments to GPU-compatible types
 @inline convert_to_device(arch, args)  = args
@@ -199,5 +197,10 @@ function arch_array(arch, arr)
     @warn "`arch_array` is deprecated. Use `on_architecture` instead."
     return on_architecture(arch, arr)
 end
+
+@inline unsafe_free!(a) = nothing
+
+import KernelAbstractions: isgpu
+isgpu(dev::Metal.MTL.MTLDeviceInstance) = true
 
 end # module

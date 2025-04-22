@@ -262,6 +262,9 @@ CUDA.allowscalar() do
         @testset "Metal extension tests" begin
             include("test_metal.jl")
         end
+        @testset "Metal end-to-end model test" begin
+            include("test_metal_model.jl")
+        end
     end
 
     # Tests for AMDGPU extension

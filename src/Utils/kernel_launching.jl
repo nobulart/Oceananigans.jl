@@ -10,6 +10,8 @@ using Base: @pure
 
 import Oceananigans
 import KernelAbstractions: get, expand
+using Metal
+import Oceananigans.Architectures: device, MetalGPU
 
 struct KernelParameters{S, O} end
 
@@ -244,7 +246,13 @@ the architecture `arch`.
     return loop, worksize
 end
 
-       
+# Disable kernel launching for MetalGPU and provide a clear error message
+# function configure_kernel(arch::MetalGPU, grid, workspec, kernel!; kwargs...)
+#     error("KernelAbstractions.jl does not support Metal.jl as a backend. Metal kernel launching is not available in Oceananigans.\n" *
+#           "You can use Metal arrays for storage, but not for GPU kernel execution.\n" *
+#           "See https://github.com/JuliaGPU/KernelAbstractions.jl/issues/357 for details.")
+# end
+
 """
     launch!(arch, grid, workspec, kernel!, kernel_args...; kw...)
 
@@ -299,6 +307,27 @@ end
     end
 
     return nothing
+end
+
+# Patch _launch! to support MetalGPU
+@inline function _launch!(arch::MetalGPU, grid, workspec, kernel!, first_kernel_arg, other_kernel_args...; exclude_periphery = false, reduced_dimensions = (), active_cells_map = nothing)
+    location = Oceananigans.location(first_kernel_arg)
+    loop!, worksize = configure_kernel(arch, grid, workspec, kernel!; location, exclude_periphery, reduced_dimensions, active_cells_map)
+    haswork = if worksize isa OffsetStaticSize
+        length(worksize) > 0
+    elseif worksize isa Number
+        worksize > 0
+    else
+        true
+    end
+    if haswork
+        loop!(first_kernel_arg, other_kernel_args...)
+    end
+    return nothing
+end
+
+function launch!(arch::MetalGPU, kernel_source::String, fn_name::String, args...; N)
+    metal_launch!(arch, kernel_source, fn_name, args...; N=N)
 end
 
 #####

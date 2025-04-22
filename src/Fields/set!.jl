@@ -1,6 +1,7 @@
 using CUDA
 using KernelAbstractions: @kernel, @index
 using Adapt: adapt_structure
+using Metal
 
 using Oceananigans.Grids: on_architecture, node_names
 using Oceananigans.Architectures: child_architecture, cpu_architecture, device, GPU, CPU
@@ -25,15 +26,15 @@ set!(obj, ::Nothing) = nothing
 
 function set!(Φ::NamedTuple; kwargs...)
     for (fldname, value) in kwargs
-        ϕ = getproperty(Φ, fldname)
-        set!(ϕ, value)
+         ϕ = getproperty(Φ, fldname)
+         set!(ϕ, value)
     end
     return nothing
 end
 
 # This interface helps us do things like set distributed fields
 set!(u::Field, f::Function) = set_to_function!(u, f)
-set!(u::Field, a::Union{Array, CuArray, OffsetArray}) = set_to_array!(u, a)
+set!(u::Field, a::Union{Array, CuArray, Metal.MtlArray, OffsetArray}) = set_to_array!(u, a)
 set!(u::Field, v::Field) = set_to_field!(u, v)
 
 function set!(u::Field, a::Number)
