@@ -55,6 +55,7 @@ end
 
 """
     NonhydrostaticModel(;           grid,
+                                    architecture = nothing,
                                     clock = Clock{eltype(grid)}(time = 0),
                                 advection = Centered(),
                                  buoyancy = nothing,
@@ -85,6 +86,8 @@ Keyword arguments
             architecture (CPU/GPU) that the model is solved on is inferred from the architecture
             of the `grid`. Note that the grid needs to be regularly spaced in the horizontal
             dimensions, ``x`` and ``y``.
+  - `architecture`: The computer architecture on which the model is run. If `nothing` (default), the architecture
+                    is inferred from the `grid`.
   - `advection`: The scheme that advects velocities and tracers. See `Oceananigans.Advection`.
   - `buoyancy`: The buoyancy model. See `Oceananigans.BuoyancyFormulations`.
   - `coriolis`: Parameters for the background rotation rate of the model.
@@ -112,6 +115,7 @@ Keyword arguments
   - `auxiliary_fields`: `NamedTuple` of auxiliary fields. Default: `nothing`         
 """
 function NonhydrostaticModel(; grid,
+                             architecture=nothing,
                              clock = Clock(grid),
                              advection = Centered(),
                              buoyancy = nothing,
@@ -132,7 +136,7 @@ function NonhydrostaticModel(; grid,
                              pressure_solver = nothing,
                              auxiliary_fields = NamedTuple())
 
-    arch = architecture(grid)
+    arch = isnothing(architecture) ? architecture(grid) : architecture
 
     tracers = tupleit(tracers) # supports tracers=:c keyword argument (for example)
 
@@ -182,6 +186,9 @@ function NonhydrostaticModel(; grid,
     # by adjusting each (x, y, z) halo individually.
     grid = inflate_grid_halo_size(grid, advection, closure)
 
+    # Move grid to the correct architecture
+    grid = on_architecture(arch, grid)
+
     # Collect boundary conditions for all model prognostic fields and, if specified, some model
     # auxiliary fields. Boundary conditions are "regularized" based on the _name_ of the field:
     # boundary conditions on u, v, w are regularized assuming they represent momentum at appropriate
@@ -207,20 +214,22 @@ function NonhydrostaticModel(; grid,
     closure = with_tracers(tracernames(tracers), closure)
 
     # Either check grid-correctness, or construct tuples of fields
-    velocities         = VelocityFields(velocities, grid, boundary_conditions)
-    tracers            = TracerFields(tracers,      grid, boundary_conditions)
-    pressures          = (pNHS=nonhydrostatic_pressure, pHY′=hydrostatic_pressure_anomaly)
-    diffusivity_fields = build_diffusivity_fields(diffusivity_fields, grid, clock, tracernames(tracers), boundary_conditions, closure)
+    velocities         = on_architecture(arch, VelocityFields(velocities, grid, boundary_conditions))
+    tracers            = on_architecture(arch, TracerFields(tracers,      grid, boundary_conditions))
+    pressures          = (
+        pNHS = on_architecture(arch, nonhydrostatic_pressure),
+        pHY′ = on_architecture(arch, hydrostatic_pressure_anomaly)
+    )
+    diffusivity_fields = on_architecture(arch, build_diffusivity_fields(diffusivity_fields, grid, clock, tracernames(tracers), boundary_conditions, closure))
 
     if isnothing(pressure_solver)
         pressure_solver = nonhydrostatic_pressure_solver(grid)
     end
 
     # Materialize background fields
-    background_fields = BackgroundFields(background_fields, tracernames(tracers), grid, clock)
+    background_fields = on_architecture(arch, BackgroundFields(background_fields, tracernames(tracers), grid, clock))
     model_fields = merge(velocities, tracers, auxiliary_fields)
     prognostic_fields = merge(velocities, tracers)
-
 
     # Instantiate timestepper if not already instantiated
     implicit_solver = implicit_diffusion_solver(time_discretization(closure), grid)
@@ -258,5 +267,5 @@ end
 
 # return the total advective velocities
 @inline total_velocities(m::NonhydrostaticModel) =
-    sum_of_velocities(m.velocities, m.background_fields.velocities) 
+    sum_of_velocities(m.velocities, m.background_fields.velocities)
 

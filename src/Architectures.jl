@@ -86,7 +86,10 @@ architecture(::Metal.MtlArray) = MetalGPU()
 array_type(::MetalGPU) = Metal.MtlArray
 
 # on_architecture for MetalGPU
-on_architecture(::MetalGPU, a::Array) = Metal.MtlArray(a)
+on_architecture(::MetalGPU, a::Array) = begin
+    println("[DEBUG][on_architecture] MetalGPU: converting Array of eltype=", eltype(a), ", typeof=", typeof(a))
+    Metal.MtlArray(a)
+end
 on_architecture(::MetalGPU, a::Metal.MtlArray) = a
 on_architecture(::MetalGPU, a::BitArray) = Metal.MtlArray(a)
 on_architecture(::MetalGPU, a::SubArray{<:Any, <:Any, <:Array}) = Metal.MtlArray(a)

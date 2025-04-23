@@ -24,7 +24,17 @@ end
 
 println("[DEBUG] arch: ", arch)
 
-grid = RectilinearGrid(size=(8, 1, 1), extent=(1.0, 1.0, 1.0))
+grid = RectilinearGrid(Float32, size=(8, 1, 1), extent=(1.0, 1.0, 1.0))
+
+println("[DEBUG] grid eltype: ", eltype(grid))
+println("[DEBUG] grid Lx type: ", typeof(grid.Lx))
+println("[DEBUG] grid xᶠᵃᵃ type: ", typeof(grid.xᶠᵃᵃ))
+println("[DEBUG] grid xᶠᵃᵃ eltype: ", eltype(grid.xᶠᵃᵃ))
+
+# Minimal Metal array allocation test
+A = Metal.MtlArray(zeros(Float32, 8, 1, 1))
+println("[DEBUG] Allocated Metal.MtlArray with Float32: ", typeof(A), ", eltype: ", eltype(A))
+
 model = NonhydrostaticModel(grid=grid, architecture=arch)
 
 set!(model.velocities.u, 1.0)
